@@ -175,6 +175,15 @@ def cmd_doctor(args: argparse.Namespace) -> int:
           f"KITTY_WINDOW_ID={os.environ.get('KITTY_WINDOW_ID', '')!r}")
     print(f"image: {image_path or '(none)'}"
           + ("" if image_path and _Path(image_path).exists() else " (missing)" if image_path else ""))
+    if image_path and _Path(image_path).exists():
+        try:
+            from PIL import Image as _Image
+
+            with _Image.open(image_path) as _im:
+                print(f"avatar: {_im.size[0]}x{_im.size[1]} {_im.format} "
+                      f"{_Path(image_path).stat().st_size} bytes")
+        except Exception as exc:
+            print(f"avatar: unreadable ({exc})")
     print(f"kitty probe: {'SUPPORTED' if kitty_mod.kitty_supported() else 'not supported -> ascii fallback'}")
     return 0
 
