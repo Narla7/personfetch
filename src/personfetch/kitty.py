@@ -36,29 +36,32 @@ def _maybe_wrap(s: str) -> str:
     return s
 
 
-def _probe_support(timeout: float = QUERY_TIMEOUT) -> bool:
-    """Ask the terminal if it speaks kitty graphics; False on any failure."""
-    if not sys.stdout.isatty():
-        return False
+#: Path to the controlling terminal for queries (monkeypatched in tests).
+_TTY_PATH = "/dev/tty"
+
+
+def _tty_query(query: str, done, timeout: float = QUERY_TIMEOUT) -> bytes:
+    """Write *query* to the terminal and read its response from the tty.
+
+    Returns the raw bytes received (possibly empty). *done(buf)* decides
+    when enough has arrived. Terminal settings are always restored.
+    """
     try:
         import select
         import termios
         import tty
     except ImportError:  # non-POSIX (Windows): no query possible
-        return False
+        return b""
     try:
-        tty_in = open("/dev/tty", "r+b", buffering=0)
+        tty_in = open(_TTY_PATH, "r+b", buffering=0)
     except OSError:
-        return False
+        return b""
     fd = tty_in.fileno()
     try:
         old = termios.tcgetattr(fd)
     except termios.error:
         tty_in.close()
-        return False
-    # Query the status of a dummy image id. Terminals with graphics support
-    # answer with an ESC_G response; anything else stays silent -> timeout.
-    query = _maybe_wrap("\x1b_Gi=99,a=q\x1b\\")
+        return b""
     try:
         tty.setraw(fd)
         sys.stdout.write(query)
@@ -77,17 +80,48 @@ def _probe_support(timeout: float = QUERY_TIMEOUT) -> bool:
             if not chunk:
                 break
             buf += chunk
-            if b"\x1b\\" in buf or b"\x07" in buf:
+            if done(buf):
                 break
-        return b"\x1b_G" in buf
+        return buf
     except (OSError, termios.error):
-        return False
+        return b""
     finally:
         try:
             termios.tcsetattr(fd, termios.TCSADRAIN, old)
         except termios.error:
             pass
         tty_in.close()
+
+
+def _probe_support(timeout: float = QUERY_TIMEOUT) -> bool:
+    """Ask the terminal if it speaks kitty graphics; False on any failure."""
+    if not sys.stdout.isatty():
+        return False
+    # Query the status of a dummy image id. Terminals with graphics support
+    # answer with an ESC_G response; anything else stays silent -> timeout.
+    query = _maybe_wrap("\x1b_Gi=99,a=q\x1b\\")
+
+    def done(buf: bytes) -> bool:
+        return b"\x1b\\" in buf or b"\x07" in buf
+
+    return b"\x1b_G" in _tty_query(query, done, timeout)
+
+
+_cached_cell_size: tuple[int, int] | None | bool = None  # None=unknown, False=unavailable
+
+
+def _cell_size(timeout: float = QUERY_TIMEOUT) -> tuple[int, int] | None:
+    """Report the terminal cell size in pixels via CSI 16 t (cached)."""
+    global _cached_cell_size
+    if _cached_cell_size is None:
+        import re as _re
+
+        def done(buf: bytes) -> bool:
+            return _re.search(rb"\x1b\[6;\d+;\d+t", buf) is not None
+
+        m = _re.search(rb"\x1b\[6;(\d+);(\d+)t", _tty_query("\x1b[16t", done, timeout))
+        _cached_cell_size = (int(m.group(2)), int(m.group(1))) if m else False
+    return _cached_cell_size or None
 
 
 def kitty_supported(force: str | None = None) -> bool:
@@ -164,9 +198,11 @@ def transmit_png(path: Path | str, cols: int | None = None) -> str:
 
 
 def display_rows(path: Path | str, cols: int) -> int:
-    """Estimate how many terminal rows a kitty image will occupy.
+    """How many terminal rows the image will occupy at *cols* columns wide.
 
-    Assumes the classic ~1:2 cell aspect ratio (char ~twice as tall as wide).
+    Exact when the terminal reports its cell size (CSI 16 t): the image is
+    scaled to ``cols`` cells wide with aspect preserved. Otherwise falls
+    back to the classic ~1:2 cell aspect guess.
     """
     try:
         with Image.open(path) as im:
@@ -174,6 +210,13 @@ def display_rows(path: Path | str, cols: int) -> int:
             w, h = im.size
         if w == 0:
             return cols // 2
+        import math as _math
+
+        cell = _cell_size()
+        if cell is not None:
+            cw, ch = cell
+            if cw > 0 and ch > 0:
+                return max(1, _math.ceil(cols * cw * h / (w * ch)))
         return max(1, round(cols * h / w / 2))
     except Exception:
         return cols // 2
