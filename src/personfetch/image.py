@@ -1,9 +1,8 @@
 """Convert an image into a retro ANSI half-block portrait.
 
-The pipeline is intentionally soft + quantized: downscale with a smooth filter,
+The pipeline downscale with a sharp filter, apply an unsharp mask,
 map to a limited palette, then render two pixels per terminal row with the
-upper-half block character (▀). The result is exactly the blurry-retro vibe
-we're aiming for.
+upper-half block character (▀).
 """
 
 from __future__ import annotations
@@ -12,7 +11,7 @@ import os
 import re
 from pathlib import Path
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 
 from .palettes import Palette
 
@@ -135,8 +134,11 @@ def portrait_from_path(
         if target_h % 2 == 1:
             target_h += 1
 
-        # Smooth downscale = the requested blurry-retro look.
+        # LANCZOS downscale + unsharp mask: keeps edges crisp instead of mushy.
         im = im.resize((target_w, target_h), Image.Resampling.LANCZOS)
+        im = im.filter(
+            ImageFilter.UnsharpMask(radius=2, percent=150, threshold=2)
+        )
         im = quantize_to_palette(im, palette, dither=dither)
         return _render_halfblocks(im)
 
