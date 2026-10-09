@@ -113,39 +113,54 @@ def kitty_supported(force: str | None = None) -> bool:
 
 
 def _transmit_chunks(data: bytes, control: str) -> str:
-    """Build the chunked ``a=T`` transmit escape sequence for *data*."""
+    """Build the chunked transmit escape sequences for *data*.
+
+    Mirrors kitty's own serializer: the first chunk carries the full
+    control data, continuation chunks carry only ``m`` — with NO leading
+    comma (``\\x1b_Gm=0;...``). A leading comma is tolerated by kitty
+    itself but makes stricter terminals drop the whole transmission.
+    """
     b64 = base64.b64encode(data).decode("ascii")
     out: list[str] = []
     first = True
     while b64:
         chunk, b64 = b64[:4096], b64[4096:]
         more = 1 if b64 else 0
-        prefix = control if first else ""
-        out.append(_maybe_wrap(f"\x1b_G{prefix},m={more};{chunk}\x1b\\"))
-        first = False
-        control = ""
+        if first:
+            out.append(_maybe_wrap(f"\x1b_G{control},m={more};{chunk}\x1b\\"))
+            first = False
+        else:
+            out.append(_maybe_wrap(f"\x1b_Gm={more};{chunk}\x1b\\"))
     return "".join(out)
 
 
 def transmit_png(path: Path | str, cols: int | None = None) -> str:
-    """Read an image file and return the kitty transmit escape sequence.
+    """Transmit an image (``a=t``) and return display + transmit sequences.
 
+    Two-step like ``kitten icat``: store with ``a=t`` (explicit pixel size
+    ``s``/``v``, byte size ``S``, image id), then display with ``a=p``.
     The image is downscaled to display size and sent losslessly (PNG,
     full color — no tint/quantization). ``cols`` sets the display width
     in terminal columns (``c=``); the terminal preserves aspect ratio.
+    ``q=2`` suppresses OK responses so they can't leak into shell input.
+    Returns ``transmit + display``; display must be printed where the
+    image should appear.
     """
     with Image.open(path) as im:
         im = ImageOps.exif_transpose(im).convert("RGB")
         im.thumbnail(MAX_TRANSMIT_SIZE, Image.Resampling.LANCZOS)
+        w, h = im.size
         import io as _io
 
         buf = _io.BytesIO()
         im.save(buf, format="PNG")
         payload = buf.getvalue()
-    control = "a=T,f=100"
+    control = f"a=t,f=100,t=d,s={w},v={h},S={len(payload)},i=1,q=2"
+    seq = _transmit_chunks(payload, control)
+    display = f"a=p,i=1,q=2"
     if cols:
-        control += f",c={cols}"
-    return _transmit_chunks(payload, control)
+        display += f",c={cols}"
+    return seq + _maybe_wrap(f"\x1b_G{display}\x1b\\")
 
 
 def display_rows(path: Path | str, cols: int) -> int:
@@ -172,28 +187,32 @@ def kitty_card(
 ) -> str:
     """Render a side-by-side card: kitty image left, info lines right.
 
-    Technique: transmit the image (occupies R rows), move the cursor back
-    up R rows, then print each info line offset by (cols + gutter) columns.
-    After the last row the cursor rests below the image. Plain ASCII/half-
-    block fallback lives in render.py — this function is kitty-only.
+    Inline layout with no cursor gymnastics: save the cursor, display the
+    image (it occupies R rows below the cursor), restore the cursor, then
+    print each info line offset by (cols + gutter) columns. Everything
+    flows from the current cursor position — never the top of the screen.
+    If the terminal ignores graphics, the text still prints sanely at the
+    cursor. Plain ASCII/half-block fallback lives in render.py.
     """
     seq = transmit_png(image_path, cols=cols)
     rows = display_rows(image_path, cols)
-    total = max(rows, len(info_lines))
     out: list[str] = []
-    out.append(seq + "\n")
-    # Cursor is now below the image; climb back to its first row.
-    out.append(f"\x1b[{total}A")
+    out.append("\x1b7")  # DECSC: save cursor
+    out.append(seq)
+    out.append("\x1b8")  # DECRC: restore cursor to the card's first row
     right = cols + gutter
-    for i in range(total):
+    for i, line in enumerate(info_lines):
+        out.append("\r")
         out.append(f"\x1b[{right}C")
-        if i < len(info_lines):
-            out.append(info_lines[i])
-        out.append("\r\n")
+        out.append(line)
+        out.append("\n")
+    # Move the cursor below the image if it is taller than the text.
+    for _ in range(max(0, rows - len(info_lines))):
+        out.append("\n")
     return "".join(out)
 
 
 def write_transmit(path: Path | str, cols: int | None = None) -> None:
-    """Transmit an image directly to stdout (for debugging)."""
-    sys.stdout.write(transmit_png(path, cols=cols))
+    """Transmit + display an image on stdout (for debugging)."""
+    sys.stdout.write("\x1b7" + transmit_png(path, cols=cols) + "\x1b8\n")
     sys.stdout.flush()
