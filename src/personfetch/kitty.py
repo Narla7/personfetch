@@ -1,7 +1,9 @@
 """Kitty graphics protocol support.
 
-Renders the portrait at full color (no palette quantization / no tint) via
-the Kitty graphics protocol, falling back to ANSI half-blocks elsewhere.
+Strategy: try kitty first, fall back to half-blocks on failure. Whether the
+terminal speaks the protocol is determined by *asking it* — a graphics
+query is sent and only an actual protocol response enables kitty rendering.
+No TERM / environment-variable guessing.
 """
 
 from __future__ import annotations
@@ -9,26 +11,93 @@ from __future__ import annotations
 import base64
 import os
 import sys
+import time
 from pathlib import Path
 
 from PIL import Image, ImageOps
 
+#: How long to wait for the terminal's query response before giving up.
+QUERY_TIMEOUT = 0.1
+#: Transmitted images are downscaled to fit this box (full-res photos would
+#: otherwise dump megabytes of base64 at the terminal).
+MAX_TRANSMIT_SIZE = (1280, 1280)
+
+_cached_support: bool | None = None
+
+
+def _tmux_wrap(s: str) -> str:
+    """Wrap an escape sequence in tmux passthrough (same as kitten icat)."""
+    return "\x1bPtmux;" + s.replace("\x1b", "\x1b\x1b") + "\x1b\\"
+
+
+def _maybe_wrap(s: str) -> str:
+    if os.environ.get("TMUX"):
+        return _tmux_wrap(s)
+    return s
+
+
+def _probe_support(timeout: float = QUERY_TIMEOUT) -> bool:
+    """Ask the terminal if it speaks kitty graphics; False on any failure."""
+    if not sys.stdout.isatty():
+        return False
+    try:
+        import select
+        import termios
+        import tty
+    except ImportError:  # non-POSIX (Windows): no query possible
+        return False
+    try:
+        tty_in = open("/dev/tty", "r+b", buffering=0)
+    except OSError:
+        return False
+    fd = tty_in.fileno()
+    try:
+        old = termios.tcgetattr(fd)
+    except termios.error:
+        tty_in.close()
+        return False
+    # Query the status of a dummy image id. Terminals with graphics support
+    # answer with an ESC_G response; anything else stays silent -> timeout.
+    query = _maybe_wrap("\x1b_Gi=99,a=q\x1b\\")
+    try:
+        tty.setraw(fd)
+        sys.stdout.write(query)
+        sys.stdout.flush()
+        deadline = time.time() + timeout
+        buf = b""
+        while time.time() < deadline:
+            remaining = deadline - time.time()
+            r, _, _ = select.select([fd], [], [], remaining)
+            if not r:
+                break
+            try:
+                chunk = os.read(fd, 1024)
+            except OSError:
+                break
+            if not chunk:
+                break
+            buf += chunk
+            if b"\x1b\\" in buf or b"\x07" in buf:
+                break
+        return b"\x1b_G" in buf
+    except (OSError, termios.error):
+        return False
+    finally:
+        try:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        except termios.error:
+            pass
+        tty_in.close()
+
 
 def kitty_supported(force: str | None = None) -> bool:
-    """Return True if the terminal likely speaks the Kitty graphics protocol.
+    """Return True if kitty graphics should be attempted.
 
-    ``force`` overrides detection: "kitty" -> True, "ascii" -> False.
-    Auto-detect order:
-      1. PERSONFETCH_KITTY=1/0 explicit override
-      2. ``force`` argument
-      3. stdout must be a TTY (never dump graphics escapes into a pipe)
-      4. $KITTY_WINDOW_ID (set by kitty itself, per window) or
-         $TERM == xterm-kitty.
-
-    Note: $KITTY_PID is deliberately NOT trusted — it leaks into child
-    environments (other terminals, pipes, tmux) where stdout doesn't speak
-    the protocol, which used to blank the output entirely.
+    ``force``: "kitty" always tries (skips the probe), "ascii" never does.
+    Otherwise the terminal is probed once per process (cached); silence or
+    any error means half-block fallback. Piped output never uses kitty.
     """
+    global _cached_support
     override = os.environ.get("PERSONFETCH_KITTY", "").lower()
     if override in ("1", "true", "yes", "kitty"):
         return True
@@ -38,13 +107,9 @@ def kitty_supported(force: str | None = None) -> bool:
         return True
     if force == "ascii":
         return False
-    if not sys.stdout.isatty():
-        return False
-    if os.environ.get("KITTY_WINDOW_ID"):
-        return True
-    if os.environ.get("TERM", "").lower() == "xterm-kitty":
-        return True
-    return False
+    if _cached_support is None:
+        _cached_support = _probe_support()
+    return _cached_support
 
 
 def _transmit_chunks(data: bytes, control: str) -> str:
@@ -56,7 +121,7 @@ def _transmit_chunks(data: bytes, control: str) -> str:
         chunk, b64 = b64[:4096], b64[4096:]
         more = 1 if b64 else 0
         prefix = control if first else ""
-        out.append(f"\x1b_G{prefix},m={more};{chunk}\x1b\\")
+        out.append(_maybe_wrap(f"\x1b_G{prefix},m={more};{chunk}\x1b\\"))
         first = False
         control = ""
     return "".join(out)
@@ -65,12 +130,13 @@ def _transmit_chunks(data: bytes, control: str) -> str:
 def transmit_png(path: Path | str, cols: int | None = None) -> str:
     """Read an image file and return the kitty transmit escape sequence.
 
-    The image is sent losslessly (PNG, full color — no tint/quantization).
-    ``cols`` sets the display width in terminal columns (``c=``); the
-    terminal preserves aspect ratio for the height.
+    The image is downscaled to display size and sent losslessly (PNG,
+    full color — no tint/quantization). ``cols`` sets the display width
+    in terminal columns (``c=``); the terminal preserves aspect ratio.
     """
     with Image.open(path) as im:
         im = ImageOps.exif_transpose(im).convert("RGB")
+        im.thumbnail(MAX_TRANSMIT_SIZE, Image.Resampling.LANCZOS)
         import io as _io
 
         buf = _io.BytesIO()
@@ -114,8 +180,6 @@ def kitty_card(
     seq = transmit_png(image_path, cols=cols)
     rows = display_rows(image_path, cols)
     total = max(rows, len(info_lines))
-    pad = " " * 0  # offsets are done with cursor-forward escapes, not spaces
-    _ = pad
     out: list[str] = []
     out.append(seq + "\n")
     # Cursor is now below the image; climb back to its first row.
@@ -125,8 +189,7 @@ def kitty_card(
         out.append(f"\x1b[{right}C")
         if i < len(info_lines):
             out.append(info_lines[i])
-        # Move to start of next line without scrolling weirdness.
-        out.append("\r\n" if i < total - 1 else "\r\n")
+        out.append("\r\n")
     return "".join(out)
 
 

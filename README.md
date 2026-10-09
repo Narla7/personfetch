@@ -131,7 +131,8 @@ Every command:
 
 | Command | Arguments | What it does |
 |---|---|---|
-| *(none)* / `show` | `[--width N] [--kitty \| --ascii]` | Render your card. Default behavior. Kitty graphics (full-color, no palette tint) when supported, half-blocks otherwise. |
+| *(none)* / `show` | `[--width N] [--kitty \| --ascii]` | Render your card. Default behavior. Tries Kitty graphics first (full-color, no palette tint); falls back to half-blocks if the terminal stays silent. |
+| `doctor` | — | Diagnose image support: tty status, TERM/multiplexer env, image path, and the live kitty-probe result. |
 | `init` | — | Interactive wizard: name, pronouns, location, OS, github, twitter, company, bio, interests, extra fields, palette, dither, logo width, photo. |
 | `set` / `add` | `label value [--color #hex]` | Create or update a field. `--color` sets the label color. |
 | `rm` | `label` | Remove a field (case-insensitive label match). Unknown label → error, exit code 1. |
@@ -140,6 +141,15 @@ Every command:
 | `palettes` | — | List built-in + custom palette names. |
 | `config` | — | Print the absolute path to `profile.json`. |
 | `export` | `[-o out.png] [--width PX]` | Render a shareable PNG card (avatar + fields, monkeytype/gravatar-style) for bios and READMEs. |
+
+How the image mode is picked: `auto` sends the terminal a kitty-graphics
+query and uses kitty rendering only if the terminal answers (result cached
+per run, ~100ms timeout). Silence, pipes, or any error → half-block
+fallback. Inside tmux, sequences are wrapped in tmux passthrough (same as
+`kitten icat`). `--kitty` forces kitty without probing, `--ascii` forces
+half-blocks, `PERSONFETCH_KITTY=1/0` overrides everything, and `personfetch
+doctor` shows the live probe result. Transmitted images are downscaled to
+display size before sending, so photos don't dump megabytes of base64.
 
 Global option: `personfetch --width N` forces the layout width if terminal
 detection misbehaves. Logo width passed to `image`/`init` is clamped to the
