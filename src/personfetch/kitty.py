@@ -167,7 +167,10 @@ def transmit_png(
     image should appear.
     """
     with Image.open(path) as im:
-        im = ImageOps.exif_transpose(im).convert("RGB")
+        im = ImageOps.exif_transpose(im)
+        # Preserve alpha when present (RGBA card PNGs); opaque photos stay RGB.
+        # A blind convert("RGB") turns transparency into a black background.
+        im = im.convert("RGBA" if "A" in im.getbands() else "RGB")
         im.thumbnail(MAX_TRANSMIT_SIZE, Image.Resampling.LANCZOS)
         w, h = im.size
         import io as _io
