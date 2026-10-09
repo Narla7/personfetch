@@ -75,19 +75,21 @@ def render(profile: dict, width: int | None = None, mode: str = "auto") -> str:
         info_lines.append(f"{colored_label}{separator} {value}")
 
     # Kitty graphics path: full-color image, no palette tint/quantization.
-    # Any failure (no image, dumb terminal, IO error) falls back to ASCII.
+    # Only attempted when a real image is set; failure (or terminal silence
+    # on the probe) falls through to half-block rendering below.
     if mode in ("auto", "kitty"):
         from . import kitty as kitty_mod
 
         image_path = profile.get("image_path")
-        want_kitty = kitty_mod.kitty_supported(force="kitty" if mode == "kitty" else None)
-        if want_kitty and image_path and Path(image_path).exists():
-            try:
-                return kitty_mod.kitty_card(
-                    Path(image_path), info_lines, cols=logo_width, gutter=gutter
-                )
-            except Exception:
-                pass  # fall through to half-block rendering below
+        if image_path and Path(image_path).exists():
+            want_kitty = kitty_mod.kitty_supported(force="kitty" if mode == "kitty" else None)
+            if want_kitty:
+                try:
+                    return kitty_mod.kitty_card(
+                        Path(image_path), info_lines, cols=logo_width, gutter=gutter
+                    )
+                except Exception:
+                    pass  # fall through to half-block rendering below
 
     logo = _build_logo(profile, palette, logo_width)
     actual_logo_width = max(image_mod.visible_len(line) for line in logo) if logo else 0

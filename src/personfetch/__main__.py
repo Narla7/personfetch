@@ -65,6 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("config", help="Print the config file path")
     sub.add_parser("palettes", help="List available palettes")
+    sub.add_parser("doctor", help="Diagnose terminal image support")
 
     expp = sub.add_parser("export", help="Render your card to a shareable PNG")
     expp.add_argument("-o", "--output", default="personfetch.png", help="Output PNG path")
@@ -160,6 +161,24 @@ def cmd_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_doctor(args: argparse.Namespace) -> int:
+    import os
+    from pathlib import Path as _Path
+
+    from . import kitty as kitty_mod
+
+    profile = load_profile()
+    image_path = profile.get("image_path")
+    print(f"stdout is a tty: {sys.stdout.isatty()}")
+    print(f"TERM={os.environ.get('TERM', '')!r} "
+          f"TMUX={'set' if os.environ.get('TMUX') else 'unset'} "
+          f"KITTY_WINDOW_ID={os.environ.get('KITTY_WINDOW_ID', '')!r}")
+    print(f"image: {image_path or '(none)'}"
+          + ("" if image_path and _Path(image_path).exists() else " (missing)" if image_path else ""))
+    print(f"kitty probe: {'SUPPORTED' if kitty_mod.kitty_supported() else 'not supported -> ascii fallback'}")
+    return 0
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -175,6 +194,7 @@ def main() -> int:
         "config": cmd_config,
         "palettes": cmd_palettes,
         "export": cmd_export,
+        "doctor": cmd_doctor,
     }.get(command)
     if not func:
         parser.print_help()
