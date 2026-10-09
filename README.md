@@ -6,6 +6,8 @@ A tiny CLI that renders *you* as a fastfetch/neofetch-style info card in your
 terminal: a retro, palette-crushed portrait on the left, your editable
 key/value fields on the right.
 
+![personfetch running in kitty](assets/screenshot-2026-10-09_19-50-47.png)
+
 > **Version:** 0.1.0 · **Language:** Python ≥ 3.11 · **Runtime dep:** Pillow — that's it
 
 ---
