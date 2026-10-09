@@ -137,7 +137,7 @@ def portrait_from_path(
         # LANCZOS downscale + unsharp mask: keeps edges crisp instead of mushy.
         im = im.resize((target_w, target_h), Image.Resampling.LANCZOS)
         im = im.filter(
-            ImageFilter.UnsharpMask(radius=2, percent=150, threshold=2)
+            ImageFilter.UnsharpMask(radius=1.5, percent=220, threshold=2)
         )
         im = quantize_to_palette(im, palette, dither=dither)
         return _render_halfblocks(im)

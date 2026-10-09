@@ -11,7 +11,7 @@ from pathlib import Path
 from .palettes import ensure_builtin_palette_files
 
 
-DEFAULT_LOGO_WIDTH = 34
+DEFAULT_LOGO_WIDTH = 44
 DEFAULT_GUTTER = 3
 DEFAULT_PALETTE = "gruvbox"
 DEFAULT_DITHER = True
