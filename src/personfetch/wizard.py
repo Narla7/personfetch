@@ -34,6 +34,14 @@ def _ask_bool(prompt: str, default: bool = True) -> bool:
     return value in ("y", "yes", "true", "1", "on")
 
 
+def _strip_quotes(s: str) -> str:
+    """Strip matching surrounding quotes that users often type interactively."""
+    s = s.strip()
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in ("'", '"'):
+        return s[1:-1]
+    return s
+
+
 def run() -> None:
     print("Welcome to personfetch! Let's build your card.\n")
 
@@ -91,7 +99,7 @@ def run() -> None:
     except ValueError:
         profile["logo_width"] = DEFAULT_LOGO_WIDTH
 
-    img = _ask("Path to a photo (optional)")
+    img = _strip_quotes(_ask("Path to a photo (optional)"))
     if img:
         p = Path(img).expanduser()
         if p.exists():
