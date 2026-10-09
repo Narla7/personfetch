@@ -49,16 +49,36 @@ def _build_logo(profile: dict, palette: list[tuple[int, int, int]] | None, logo_
     return image_mod.fallback_logo()
 
 
-def render(profile: dict, width: int | None = None, mode: str = "auto") -> str:
+def render(profile: dict, width: int | None = None, mode: str = "ascii") -> str:
     """Render a profile as a fastfetch-style card.
 
-    ``mode``: "auto" (kitty graphics if supported, else half-blocks),
-    "kitty" (force kitty, fall back to half-blocks on any error), or
-    "ascii" (force half-blocks).
+    ``mode``: "ascii" (default — half-blocks, works everywhere) or "image"
+    (whole card composed to one PNG and shown via kitty graphics; falls
+    back to half-blocks if the terminal stays silent on the probe).
     """
     term_w, _ = shutil.get_terminal_size((80, 24))
     if width is None:
         width = term_w
+
+    # Image path: single full-card PNG, no column alignment involved.
+    # Failure (or terminal silence on the probe) falls through to ASCII.
+    if mode == "image":
+        from . import kitty as kitty_mod
+
+        if kitty_mod.kitty_supported():
+            try:
+                return kitty_mod.kitty_full_card(
+                    profile, cols=max(20, min(width, 80))
+                )
+            except Exception:
+                pass
+        else:
+            import sys as _sys
+
+            _sys.stderr.write(
+                "personfetch: terminal ignored the graphics probe, "
+                "falling back to ascii\n"
+            )
 
     palette_name = profile.get("palette", "gruvbox")
     palette: list[tuple[int, int, int]] | None = (
@@ -75,23 +95,6 @@ def render(profile: dict, width: int | None = None, mode: str = "auto") -> str:
         color = field.get("color", "#ebdbb2")
         colored_label = ansi_fg(color) + label + "\033[0m"
         info_lines.append(f"{colored_label}{separator} {value}")
-
-    # Kitty graphics path: full-color image, no palette tint/quantization.
-    # Only attempted when a real image is set; failure (or terminal silence
-    # on the probe) falls through to half-block rendering below.
-    if mode in ("auto", "kitty"):
-        from . import kitty as kitty_mod
-
-        image_path = profile.get("image_path")
-        if image_path and Path(image_path).exists():
-            want_kitty = kitty_mod.kitty_supported(force="kitty" if mode == "kitty" else None)
-            if want_kitty:
-                try:
-                    return kitty_mod.kitty_card(
-                        Path(image_path), info_lines, cols=logo_width, gutter=gutter
-                    )
-                except Exception:
-                    pass  # fall through to half-block rendering below
 
     logo = _build_logo(profile, palette, logo_width)
     actual_logo_width = max(image_mod.visible_len(line) for line in logo) if logo else 0

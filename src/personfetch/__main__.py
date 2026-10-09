@@ -33,10 +33,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     img_mode = parser.add_mutually_exclusive_group()
     img_mode.add_argument(
-        "--kitty", action="store_true", help="Force Kitty graphics protocol"
+        "--image", action="store_true", help="Render the card as an inline image (kitty graphics)"
     )
     img_mode.add_argument(
-        "--ascii", action="store_true", help="Force ASCII half-block rendering"
+        "--kitty", action="store_true", help="Alias for --image"
+    )
+    img_mode.add_argument(
+        "--ascii", action="store_true", help="Force ASCII half-block rendering (default)"
     )
 
     sub = parser.add_subparsers(dest="command")
@@ -75,11 +78,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _mode_from_args(args: argparse.Namespace) -> str:
-    if getattr(args, "kitty", False):
-        return "kitty"
+    import os as _os
+
+    if getattr(args, "kitty", False) or getattr(args, "image", False):
+        return "image"
     if getattr(args, "ascii", False):
         return "ascii"
-    return "auto"
+    if _os.environ.get("PERSONFETCH_KITTY", "").lower() in ("1", "true", "yes", "kitty"):
+        return "image"
+    return "ascii"
 
 
 def cmd_show(args: argparse.Namespace) -> int:

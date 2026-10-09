@@ -115,9 +115,8 @@ from a fresh clone/pull.
 ```bash
 personfetch init                                      # interactive first-time setup wizard
 personfetch image ~/Pictures/me.jpg --palette catppuccin --width 34
-personfetch                                           # show your card (default command)
-personfetch --kitty                                   # force Kitty graphics (full-color, no tint)
-personfetch --ascii                                   # force half-block fallback
+personfetch                                           # show your card, ascii (default, works everywhere)
+personfetch --image                                   # full card as one inline image (kitty graphics)
 personfetch set interests "linux, guitars,coding"
 personfetch add pronouns  he/him                            # `add` is an alias for `set`
 personfetch rm age                                    # what do you think it does???  
@@ -131,7 +130,7 @@ Every command:
 
 | Command | Arguments | What it does |
 |---|---|---|
-| *(none)* / `show` | `[--width N] [--kitty \| --ascii]` | Render your card. Default behavior. Tries Kitty graphics first (full-color, no palette tint); falls back to half-blocks if the terminal stays silent. |
+| *(none)* / `show` | `[--width N] [--image \| --ascii]` | Render your card. ASCII half-blocks by default (works in every terminal). `--image` composes the whole card to one PNG and shows it inline via kitty graphics, no palette tint. |
 | `doctor` | — | Diagnose image support: tty status, TERM/multiplexer env, image path, and the live kitty-probe result. |
 | `init` | — | Interactive wizard: name, pronouns, location, OS, github, twitter, company, bio, interests, extra fields, palette, dither, logo width, photo. |
 | `set` / `add` | `label value [--color #hex]` | Create or update a field. `--color` sets the label color. |
@@ -142,14 +141,16 @@ Every command:
 | `config` | — | Print the absolute path to `profile.json`. |
 | `export` | `[-o out.png] [--width PX]` | Render a shareable PNG card (avatar + fields, monkeytype/gravatar-style) for bios and READMEs. |
 
-How the image mode is picked: `auto` sends the terminal a kitty-graphics
-query and uses kitty rendering only if the terminal answers (result cached
-per run, ~100ms timeout). Silence, pipes, or any error → half-block
-fallback. Inside tmux, sequences are wrapped in tmux passthrough (same as
-`kitten icat`). `--kitty` forces kitty without probing, `--ascii` forces
-half-blocks, `PERSONFETCH_KITTY=1/0` overrides everything, and `personfetch
-doctor` shows the live probe result. Transmitted images are downscaled to
-display size before sending, so photos don't dump megabytes of base64.
+How the image mode is picked: plain `personfetch` always renders ASCII —
+no terminal queries, works everywhere. `personfetch --image` (or
+`--kitty`, or `PERSONFETCH_KITTY=1`) composes the entire card to a single
+PNG and displays it inline with an explicit cell footprint, so there is no
+column alignment or height guessing. The terminal is still probed first,
+and silence falls back to ASCII with a stderr note (plus `personfetch
+doctor` shows the live probe result). Inside tmux, sequences are wrapped
+in tmux passthrough (same as `kitten icat`). Transmitted images are
+downscaled to display size before sending, so photos don't dump megabytes
+of base64.
 
 Global option: `personfetch --width N` forces the layout width if terminal
 detection misbehaves. Logo width passed to `image`/`init` is clamped to the

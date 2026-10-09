@@ -168,14 +168,17 @@ def _transmit_chunks(data: bytes, control: str) -> str:
     return "".join(out)
 
 
-def transmit_png(path: Path | str, cols: int | None = None) -> str:
+def transmit_png(
+    path: Path | str, cols: int | None = None, rows: int | None = None
+) -> str:
     """Transmit an image (``a=t``) and return display + transmit sequences.
 
     Two-step like ``kitten icat``: store with ``a=t`` (explicit pixel size
     ``s``/``v``, byte size ``S``, image id), then display with ``a=p``.
     The image is downscaled to display size and sent losslessly (PNG,
-    full color — no tint/quantization). ``cols`` sets the display width
-    in terminal columns (``c=``); the terminal preserves aspect ratio.
+    full color — no tint/quantization). ``cols``/``rows`` fix the display
+    footprint in terminal cells (``c=``/``r=``); pass both to make the
+    footprint deterministic instead of font-dependent.
     ``q=2`` suppresses OK responses so they can't leak into shell input.
     Returns ``transmit + display``; display must be printed where the
     image should appear.
@@ -191,9 +194,11 @@ def transmit_png(path: Path | str, cols: int | None = None) -> str:
         payload = buf.getvalue()
     control = f"a=t,f=100,t=d,s={w},v={h},S={len(payload)},i=1,q=2"
     seq = _transmit_chunks(payload, control)
-    display = f"a=p,i=1,q=2"
+    display = "a=p,i=1,q=2"
     if cols:
         display += f",c={cols}"
+    if rows:
+        display += f",r={rows}"
     return seq + _maybe_wrap(f"\x1b_G{display}\x1b\\")
 
 
@@ -222,40 +227,43 @@ def display_rows(path: Path | str, cols: int) -> int:
         return cols // 2
 
 
-def kitty_card(
-    image_path: Path | str,
-    info_lines: list[str],
-    cols: int = 34,
-    gutter: int = 3,
-) -> str:
-    """Render a side-by-side card: kitty image left, info lines right.
+def kitty_full_card(profile: dict, cols: int = 80) -> str:
+    """Render the whole card as one PNG and display it inline.
 
-    Inline layout with no cursor gymnastics: save the cursor, display the
-    image (it occupies R rows below the cursor), restore the cursor, then
-    print each info line offset by (cols + gutter) columns. Everything
-    flows from the current cursor position — never the top of the screen.
-    If the terminal ignores graphics, the text still prints sanely at the
-    cursor. Plain ASCII/half-block fallback lives in render.py.
+    The card (avatar + fields) is composed with the export renderer, then
+    transmitted and displayed with an explicit ``c``/``r`` footprint, so
+    the terminal reserves exactly that grid area — no column alignment,
+    no height guessing, no cursor climbs. The cursor is parked exactly
+    below the image when done. A temporary PNG is used and removed.
     """
-    seq = transmit_png(image_path, cols=cols)
-    rows = display_rows(image_path, cols)
+    import tempfile as _tempfile
+
+    from .export import export_png
+
+    tmp = _tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    tmp.close()
+    try:
+        # ~12px per column keeps text crisp without megabyte transmits.
+        png_path = export_png(profile, tmp.name, width=max(240, cols * 12))
+        rows = display_rows(png_path, cols)
+        seq = transmit_png(png_path, cols=cols, rows=rows)
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
     out: list[str] = []
     out.append("\x1b7")  # DECSC: save cursor
     out.append(seq)
-    out.append("\x1b8")  # DECRC: restore cursor to the card's first row
-    right = cols + gutter
-    for i, line in enumerate(info_lines):
-        out.append("\r")
-        out.append(f"\x1b[{right}C")
-        out.append(line)
-        out.append("\n")
-    # Move the cursor below the image if it is taller than the text.
-    for _ in range(max(0, rows - len(info_lines))):
-        out.append("\n")
+    out.append("\x1b8")  # DECRC: back to the card's first row
+    out.append(f"\x1b[{rows}B")  # CUD: straight down past the reserved rows
+    out.append("\r\n")
     return "".join(out)
 
 
-def write_transmit(path: Path | str, cols: int | None = None) -> None:
+def write_transmit(
+    path: Path | str, cols: int | None = None, rows: int | None = None
+) -> None:
     """Transmit + display an image on stdout (for debugging)."""
-    sys.stdout.write("\x1b7" + transmit_png(path, cols=cols) + "\x1b8\n")
+    sys.stdout.write("\x1b7" + transmit_png(path, cols=cols, rows=rows) + "\x1b8\n")
     sys.stdout.flush()
