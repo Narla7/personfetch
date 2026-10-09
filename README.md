@@ -97,6 +97,16 @@ pipx install .
 uv run personfetch --help
 ```
 
+**With Nix (no install, runs directly):**
+
+```bash
+nix run github:Narla7/personfetch
+```
+
+Config always lives in `~/.config/personfetch/`
+(respects `$XDG_CONFIG_HOME`) — same path whether installed via uv,
+pipx, or Nix.
+
 **Update:** re-run `uv tool install . --force` (or `pipx install . --force`)
 from a fresh clone/pull.
 
@@ -106,26 +116,30 @@ from a fresh clone/pull.
 personfetch init                                      # interactive first-time setup wizard
 personfetch image ~/Pictures/me.jpg --palette catppuccin --width 34
 personfetch                                           # show your card (default command)
+personfetch --kitty                                   # force Kitty graphics (full-color, no tint)
+personfetch --ascii                                   # force half-block fallback
 personfetch set interests "linux, guitars,coding"
 personfetch add pronouns  he/him                            # `add` is an alias for `set`
 personfetch rm age                                    # what do you think it does???  
 personfetch list                                      # plain-text dump of all fields
 personfetch palettes                                  # what palettes exist
 personfetch config                                    # print the profile.json path
+personfetch export -o card.png                        # shareable PNG for your bio/README
 ```
 
 Every command:
 
 | Command | Arguments | What it does |
 |---|---|---|
-| *(none)* / `show` | `[--width N]` | Render your card. Default behavior. |
-| `init` | — | Interactive wizard: name, age, location, OS, interests, extra fields, palette, dither, logo width, photo. |
+| *(none)* / `show` | `[--width N] [--kitty \| --ascii]` | Render your card. Default behavior. Kitty graphics (full-color, no palette tint) when supported, half-blocks otherwise. |
+| `init` | — | Interactive wizard: name, pronouns, location, OS, github, twitter, company, bio, interests, extra fields, palette, dither, logo width, photo. |
 | `set` / `add` | `label value [--color #hex]` | Create or update a field. `--color` sets the label color. |
 | `rm` | `label` | Remove a field (case-insensitive label match). Unknown label → error, exit code 1. |
 | `image` | `path [--palette NAME] [--width N] [--no-dither]` | Sets your portrait (copied to `avatar.png`), optionally switching palette/width/dither in the same go. |
 | `list` | — | Print all fields as plain `label: value` lines. |
 | `palettes` | — | List built-in + custom palette names. |
 | `config` | — | Print the absolute path to `profile.json`. |
+| `export` | `[-o out.png] [--width PX]` | Render a shareable PNG card (avatar + fields, monkeytype/gravatar-style) for bios and READMEs. |
 
 Global option: `personfetch --width N` forces the layout width if terminal
 detection misbehaves. Logo width passed to `image`/`init` is clamped to the
@@ -197,7 +211,7 @@ keys are backfilled when an older file is loaded):
 | `gutter` | `3` | Spaces between portrait and info column. |
 | `dither` | `true` | Floyd–Steinberg dithering during quantization. |
 | `separator` | `":"` | Between label and value (e.g. `" → "` if you're fancy). |
-| `fields` | name / age / os / interests | List of `{label, value, color}` objects. |
+| `fields` | name / pronouns / os / github / twitter / company / location / bio / interests | List of `{label, value, color}` objects. |
 
 `fields` entries are plain JSON — you can hand-edit them (or the whole file)
 and the next `personfetch` run just works. The default `name`/`age` values are
@@ -221,9 +235,11 @@ Layout (src-layout, `uv_build` backend):
 src/personfetch/
 ├── __main__.py    # argparse CLI + subcommand handlers
 ├── __init__.py    # __version__
-├── profile.py     # config dir, profile.json load/save/migrate, field ops, OS detect
-├── render.py      # card layout: logo column + colored info column
+├── profile.py     # config dir (~/.config/personfetch), profile.json load/save/migrate, field ops, OS detect
+├── render.py      # card layout: kitty-graphics-first, half-block fallback + colored info column
 ├── image.py       # Pillow pipeline + ANSI half-block renderer + color fallback
+├── kitty.py       # Kitty graphics protocol transmit (full-color, no tint) + support detection
+├── export.py      # shareable PNG card renderer (gravatar/monkeytype-style)
 ├── palettes.py    # built-ins, JSON loading, custom palette discovery
 └── wizard.py      # `init` interactive setup
 ```

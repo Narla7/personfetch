@@ -56,7 +56,11 @@ def detect_os() -> str:
 
 
 def default_profile() -> dict:
-    """A starter profile so the first run is never empty."""
+    """A starter profile so the first run is never empty.
+
+    Ships with a wide range of fields pre-filled (all editable/removable)
+    so a fresh install already looks like a real bio card.
+    """
     return {
         "version": 1,
         "image_path": None,
@@ -67,8 +71,13 @@ def default_profile() -> dict:
         "separator": DEFAULT_SEPARATOR,
         "fields": [
             {"label": "name", "value": "Narla", "color": "#fabd2f"},
-            {"label": "age", "value": "21", "color": "#b8bb26"},
+            {"label": "pronouns", "value": "he/him", "color": "#8ec07c"},
             {"label": "os", "value": detect_os(), "color": "#83a598"},
+            {"label": "github", "value": "github.com/Narla7", "color": "#d3869b"},
+            {"label": "twitter", "value": "@narla7", "color": "#83a598"},
+            {"label": "company", "value": "acme", "color": "#fe8019"},
+            {"label": "location", "value": "india", "color": "#b8bb26"},
+            {"label": "bio", "value": "fastfetch, but for people", "color": "#ebdbb2"},
             {"label": "interests", "value": "linux, code, music", "color": "#d3869b"},
         ],
     }

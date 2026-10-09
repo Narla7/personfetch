@@ -31,6 +31,13 @@ def build_parser() -> argparse.ArgumentParser:
         dest="term_width",
         help="Force terminal width for layout",
     )
+    img_mode = parser.add_mutually_exclusive_group()
+    img_mode.add_argument(
+        "--kitty", action="store_true", help="Force Kitty graphics protocol"
+    )
+    img_mode.add_argument(
+        "--ascii", action="store_true", help="Force ASCII half-block rendering"
+    )
 
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("init", help="Run the interactive setup wizard")
@@ -59,12 +66,24 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("config", help="Print the config file path")
     sub.add_parser("palettes", help="List available palettes")
 
+    expp = sub.add_parser("export", help="Render your card to a shareable PNG")
+    expp.add_argument("-o", "--output", default="personfetch.png", help="Output PNG path")
+    expp.add_argument("--width", type=int, default=1200, help="Card width in pixels")
+
     return parser
+
+
+def _mode_from_args(args: argparse.Namespace) -> str:
+    if getattr(args, "kitty", False):
+        return "kitty"
+    if getattr(args, "ascii", False):
+        return "ascii"
+    return "auto"
 
 
 def cmd_show(args: argparse.Namespace) -> int:
     profile = load_profile()
-    print(render(profile, width=args.term_width))
+    print(render(profile, width=args.term_width, mode=_mode_from_args(args)))
     return 0
 
 
@@ -132,6 +151,15 @@ def cmd_palettes(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_export(args: argparse.Namespace) -> int:
+    from .export import export_png
+
+    profile = load_profile()
+    dest = export_png(profile, args.output, width=args.width)
+    print(f"Card exported to {dest}")
+    return 0
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -146,6 +174,7 @@ def main() -> int:
         "image": cmd_image,
         "config": cmd_config,
         "palettes": cmd_palettes,
+        "export": cmd_export,
     }.get(command)
     if not func:
         parser.print_help()
