@@ -62,9 +62,10 @@ def _build_logo(
 def render(profile: dict, width: int | None = None, mode: str = "auto") -> str:
     """Render a profile as a fastfetch-style card.
 
-    ``mode``: "auto" (kitty graphics if the terminal supports it, else the
-    profile's ``image_mode`` style), "kitty" (force), "braille" (force the
-    2x-detailed braille renderer), "ascii" (force classic half-blocks).
+    ``mode``: "auto" (the profile's ``image_mode`` style, half-blocks by
+    default), "kitty" (explicit --kitty-image: full-color transmission),
+    "braille" (force the 2x-detailed braille renderer), "ascii" (force
+    classic half-blocks).
     """
     term_w, _ = shutil.get_terminal_size((80, 24))
     if width is None:
@@ -87,20 +88,20 @@ def render(profile: dict, width: int | None = None, mode: str = "auto") -> str:
         info_lines.append(f"{colored_label}{separator} {value}")
 
     # Kitty graphics path: full-color image transmitted over the protocol.
+    # Only used when explicitly forced with ``mode="kitty"`` (--kitty-image);
+    # the default render is the classic half-block art.
     from . import kitty as kitty_mod
 
     image_path = profile.get("image_path")
     if (
-        mode in ("auto", "kitty")
+        mode == "kitty"
         and image_path
         and Path(image_path).exists()
-        and kitty_mod.supports_kitty(force="kitty" if mode == "kitty" else None)
+        and kitty_mod.supports_kitty()
     ):
         try:
-            logo_rows = kitty_mod.display_rows(image_path, logo_width)
-            centered = _vcenter(info_lines, logo_rows)
             return kitty_mod.kitty_card(
-                image_path, centered, cols=logo_width, gutter=gutter
+                image_path, info_lines, cols=logo_width, gutter=gutter
             )
         except (OSError, ValueError):
             pass
@@ -110,7 +111,7 @@ def render(profile: dict, width: int | None = None, mode: str = "auto") -> str:
         if mode == "ascii"
         else "braille"
         if mode == "braille"
-        else profile.get("image_mode", "braille")
+        else profile.get("image_mode", "halfblock")
     )
 
     logo = _build_logo(profile, palette, logo_width, image_mode=image_mode)
@@ -126,18 +127,11 @@ def render(profile: dict, width: int | None = None, mode: str = "auto") -> str:
         info_width = max((image_mod.visible_len(line) for line in info_lines), default=0)
 
     lines = []
-    right_lines = _vcenter(info_lines, max(len(logo), len(info_lines)))
-    max_rows = max(len(logo), len(right_lines))
+    max_rows = max(len(logo), len(info_lines))
     for i in range(max_rows):
         left = logo[i] if i < len(logo) else " " * actual_logo_width
-        right = right_lines[i] if i < len(right_lines) else ""
+        right = info_lines[i] if i < len(info_lines) else ""
         left = pad_ansi(left, actual_logo_width)
         lines.append(left + " " * gutter + right)
 
     return "\n".join(lines)
-
-
-def _vcenter(info_lines: list[str], height: int) -> list[str]:
-    """Pad *info_lines* with blank lines so they sit vertically centered."""
-    pad = max(0, (height - len(info_lines)) // 2)
-    return [""] * pad + info_lines

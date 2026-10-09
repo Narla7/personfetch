@@ -33,13 +33,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     img_mode = parser.add_mutually_exclusive_group()
     img_mode.add_argument(
-        "--kitty", action="store_true", help="Force Kitty graphics rendering"
+        "--kitty-image",
+        action="store_true",
+        help="Render the portrait at full color via the Kitty graphics protocol",
     )
     img_mode.add_argument(
         "--braille", action="store_true", help="Force braille rendering (2x detail)"
     )
     img_mode.add_argument(
-        "--ascii", action="store_true", help="Force half-block rendering"
+        "--ascii", action="store_true", help="Force half-block rendering (default style)"
     )
 
     sub = parser.add_subparsers(dest="command")
@@ -82,7 +84,7 @@ def cmd_show(args: argparse.Namespace) -> int:
     profile = load_profile()
     mode = (
         "kitty"
-        if args.kitty
+        if args.kitty_image
         else "braille"
         if args.braille
         else "ascii"

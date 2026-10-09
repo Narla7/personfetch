@@ -162,19 +162,6 @@ def _transmit(data: bytes, w: int, h: int, cols: int, rows: int, ident: int) -> 
     return "".join(parts)
 
 
-def display_rows(image_path: Path | str, cols: int) -> int:
-    """Rows the transmitted image will occupy at *cols* terminal columns."""
-    cell = _cell_size()
-    cell_w, cell_h = cell if cell else (10, 20)
-    with Image.open(image_path) as im:
-        im = ImageOps.exif_transpose(im)
-        w, h = im.size
-    if w <= 0:
-        return 1
-    h_px = round(h * (cols * cell_w) / w)
-    return max(1, -(-h_px // cell_h))
-
-
 def kitty_card(
     image_path: Path | str,
     info_lines: list[str],

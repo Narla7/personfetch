@@ -6,20 +6,6 @@ A tiny CLI that renders *you* as a fastfetch/neofetch-style info card in your
 terminal: a retro, palette-crushed portrait on the left, your editable
 key/value fields on the right.
 
-```console
-$ personfetch
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   name: Narla
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   os: Arch Linx
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   interests: linux, code, music
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   shell: Bash
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
-...
-```
-
-(In real life the `▀` half-blocks are **colored** with your photo's pixels —
-two terminal rows per line.)
-
 > **Version:** 0.1.0 · **Language:** Python ≥ 3.11 · **Runtime dep:** Pillow — that's it
 
 ---
@@ -44,8 +30,9 @@ two terminal rows per line.)
   EXIF-rotated, LANCZOS-downscaled, quantized to a limited palette (with
   Floyd–Steinberg dithering by default), and rendered with the upper-half
   block character `▀` — two pixels per terminal row. An experimental,
-  opt-in `--braille` mode crams 2x4 subpixels into every cell instead
-  (fortify detail, at the cost of some color fidelity).
+  opt-in `--braille` mode crams 2x4 subpixels into every cell instead,
+  and `--kitty-image` in supported terminals (kitty et al.) transmits the
+  portrait as a full-color image through the Kitty graphics protocol.
 - **Editable fastfetch-style fields** — add, change, or remove any
   `label: value` line. Labels are colored, per-field, with hex colors.
 - **New fields get auto-colored** from your current palette (cycling through
@@ -120,7 +107,7 @@ Every command:
 
 | Command | Arguments | What it does |
 |---|---|---|
-| *(none)* / `show` | `[--width N] [--kitty \| --braille \| --ascii]` | Render your card. Default: kitty graphics if the terminal answers, else the profile's `image_mode` (half-blocks). |
+| *(none)* / `show` | `[--width N] [--kitty-image \| --braille \| --ascii]` | Render your card. Default: classic half-block art from `image_mode`. `--kitty-image` renders full color via the Kitty graphics protocol (probes the terminal first; falls back on silence). |
 | `init` | — | Interactive wizard: name, age, location, OS, interests, extra fields, palette, dither, logo width, photo. |
 | `set` / `add` | `label value [--color #hex]` | Create or update a field. `--color` sets the label color. |
 | `rm` | `label` | Remove a field (case-insensitive label match). Unknown label → error, exit code 1. |
