@@ -21,8 +21,13 @@ def kitty_supported(force: str | None = None) -> bool:
     Auto-detect order:
       1. PERSONFETCH_KITTY=1/0 explicit override
       2. ``force`` argument
-      3. $KITTY_WINDOW_ID / $KITTY_PID / $TERM == xterm-kitty / $TERM_PROGRAM
-         in (kitty, WezTerm, ghostty — all speak kitty graphics these days)
+      3. stdout must be a TTY (never dump graphics escapes into a pipe)
+      4. $KITTY_WINDOW_ID (set by kitty itself, per window) or
+         $TERM == xterm-kitty.
+
+    Note: $KITTY_PID is deliberately NOT trusted — it leaks into child
+    environments (other terminals, pipes, tmux) where stdout doesn't speak
+    the protocol, which used to blank the output entirely.
     """
     override = os.environ.get("PERSONFETCH_KITTY", "").lower()
     if override in ("1", "true", "yes", "kitty"):
@@ -33,13 +38,11 @@ def kitty_supported(force: str | None = None) -> bool:
         return True
     if force == "ascii":
         return False
-    if os.environ.get("KITTY_WINDOW_ID") or os.environ.get("KITTY_PID"):
+    if not sys.stdout.isatty():
+        return False
+    if os.environ.get("KITTY_WINDOW_ID"):
         return True
-    term = os.environ.get("TERM", "").lower()
-    if "kitty" in term:
-        return True
-    prog = os.environ.get("TERM_PROGRAM", "").lower()
-    if prog in ("kitty", "wezterm", "ghostty"):
+    if os.environ.get("TERM", "").lower() == "xterm-kitty":
         return True
     return False
 
