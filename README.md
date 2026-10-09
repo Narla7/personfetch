@@ -1,6 +1,6 @@
 # personfetch
 
-> **fastfetch, but for people.** 🧑‍💻
+> **fastfetch, but for people.** 
 
 A tiny CLI that renders *you* as a fastfetch/neofetch-style info card in your
 terminal: a retro, palette-crushed portrait on the left, your editable
@@ -9,9 +9,9 @@ key/value fields on the right.
 ```console
 $ personfetch
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   name: Narla
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   os: Omarchy
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   os: Arch Linx
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   interests: linux, code, music
-▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   shell: fish
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀   shell: Bash
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
 ...
@@ -109,7 +109,7 @@ from a fresh clone/pull.
 personfetch init                                      # interactive first-time setup wizard
 personfetch image ~/Pictures/me.jpg --palette catppuccin --width 34
 personfetch                                           # show your card (default command)
-personfetch set interests "linux, guitars, late-night coding"
+personfetch set interests "linux, guitars,coding"
 personfetch add shell fish                            # `add` is an alias for `set`
 personfetch rm age
 personfetch list                                      # plain-text dump of all fields
