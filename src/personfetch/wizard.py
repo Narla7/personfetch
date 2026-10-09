@@ -60,9 +60,9 @@ def run() -> None:
     if name:
         set_field(profile, "name", name)
 
-    age = _ask("Age (optional)")
-    if age:
-        set_field(profile, "age", age)
+    pronouns = _ask("Pronouns (optional)")
+    if pronouns:
+        set_field(profile, "pronouns", pronouns)
 
     location = _ask("Location (optional)")
     if location:
@@ -70,6 +70,22 @@ def run() -> None:
 
     os_val = _ask("OS", default=detect_os())
     set_field(profile, "os", os_val)
+
+    github = _ask("GitHub (optional)")
+    if github:
+        set_field(profile, "github", github)
+
+    twitter = _ask("Twitter/X (optional)")
+    if twitter:
+        set_field(profile, "twitter", twitter)
+
+    company = _ask("Company (optional)")
+    if company:
+        set_field(profile, "company", company)
+
+    bio = _ask("Bio (optional)")
+    if bio:
+        set_field(profile, "bio", bio)
 
     interests = _ask("Interests")
     if interests:

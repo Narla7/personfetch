@@ -49,8 +49,13 @@ def _build_logo(profile: dict, palette: list[tuple[int, int, int]], logo_width: 
     return image_mod.fallback_logo()
 
 
-def render(profile: dict, width: int | None = None) -> str:
-    """Render a profile as a fastfetch-style card."""
+def render(profile: dict, width: int | None = None, mode: str = "auto") -> str:
+    """Render a profile as a fastfetch-style card.
+
+    ``mode``: "auto" (kitty graphics if supported, else half-blocks),
+    "kitty" (force kitty, fall back to half-blocks on any error), or
+    "ascii" (force half-blocks).
+    """
     term_w, _ = shutil.get_terminal_size((80, 24))
     if width is None:
         width = term_w
@@ -61,9 +66,6 @@ def render(profile: dict, width: int | None = None) -> str:
     gutter = profile.get("gutter", 3)
     separator = profile.get("separator", ":")
 
-    logo = _build_logo(profile, palette, logo_width)
-    actual_logo_width = max(image_mod.visible_len(line) for line in logo) if logo else 0
-
     info_lines = []
     for field in profile.get("fields", []):
         label = field.get("label", "")
@@ -71,6 +73,24 @@ def render(profile: dict, width: int | None = None) -> str:
         color = field.get("color", "#ebdbb2")
         colored_label = ansi_fg(color) + label + "\033[0m"
         info_lines.append(f"{colored_label}{separator} {value}")
+
+    # Kitty graphics path: full-color image, no palette tint/quantization.
+    # Any failure (no image, dumb terminal, IO error) falls back to ASCII.
+    if mode in ("auto", "kitty"):
+        from . import kitty as kitty_mod
+
+        image_path = profile.get("image_path")
+        want_kitty = kitty_mod.kitty_supported(force="kitty" if mode == "kitty" else None)
+        if want_kitty and image_path and Path(image_path).exists():
+            try:
+                return kitty_mod.kitty_card(
+                    Path(image_path), info_lines, cols=logo_width, gutter=gutter
+                )
+            except Exception:
+                pass  # fall through to half-block rendering below
+
+    logo = _build_logo(profile, palette, logo_width)
+    actual_logo_width = max(image_mod.visible_len(line) for line in logo) if logo else 0
 
     info_width = max((image_mod.visible_len(line) for line in info_lines), default=0)
 
