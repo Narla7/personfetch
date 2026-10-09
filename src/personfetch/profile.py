@@ -12,6 +12,8 @@ from .palettes import ensure_builtin_palette_files
 
 
 DEFAULT_LOGO_WIDTH = 44
+
+DEFAULT_IMAGE_MODE = "halfblock"
 DEFAULT_GUTTER = 3
 DEFAULT_PALETTE = "gruvbox"
 DEFAULT_DITHER = True
@@ -62,6 +64,7 @@ def default_profile() -> dict:
         "image_path": None,
         "palette": DEFAULT_PALETTE,
         "logo_width": DEFAULT_LOGO_WIDTH,
+        "image_mode": DEFAULT_IMAGE_MODE,
         "gutter": DEFAULT_GUTTER,
         "dither": DEFAULT_DITHER,
         "separator": DEFAULT_SEPARATOR,
@@ -89,6 +92,7 @@ def load_profile() -> dict:
     profile.setdefault("image_path", None)
     profile.setdefault("palette", DEFAULT_PALETTE)
     profile.setdefault("logo_width", DEFAULT_LOGO_WIDTH)
+    profile.setdefault("image_mode", DEFAULT_IMAGE_MODE)
     profile.setdefault("gutter", DEFAULT_GUTTER)
     profile.setdefault("dither", DEFAULT_DITHER)
     profile.setdefault("separator", DEFAULT_SEPARATOR)

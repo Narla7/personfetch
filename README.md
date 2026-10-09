@@ -43,7 +43,9 @@ two terminal rows per line.)
 - **Portrait as ANSI art** — any photo (JPG/PNG/whatever Pillow opens) gets
   EXIF-rotated, LANCZOS-downscaled, quantized to a limited palette (with
   Floyd–Steinberg dithering by default), and rendered with the upper-half
-  block character `▀` — two pixels per terminal row.
+  block character `▀` — two pixels per terminal row. An experimental,
+  opt-in `--braille` mode crams 2x4 subpixels into every cell instead
+  (fortify detail, at the cost of some color fidelity).
 - **Editable fastfetch-style fields** — add, change, or remove any
   `label: value` line. Labels are colored, per-field, with hex colors.
 - **New fields get auto-colored** from your current palette (cycling through
@@ -118,11 +120,11 @@ Every command:
 
 | Command | Arguments | What it does |
 |---|---|---|
-| *(none)* / `show` | `[--width N]` | Render your card. Default behavior. |
+| *(none)* / `show` | `[--width N] [--kitty \| --braille \| --ascii]` | Render your card. Default: kitty graphics if the terminal answers, else the profile's `image_mode` (half-blocks). |
 | `init` | — | Interactive wizard: name, age, location, OS, interests, extra fields, palette, dither, logo width, photo. |
 | `set` / `add` | `label value [--color #hex]` | Create or update a field. `--color` sets the label color. |
 | `rm` | `label` | Remove a field (case-insensitive label match). Unknown label → error, exit code 1. |
-| `image` | `path [--palette NAME] [--width N] [--no-dither]` | Sets your portrait (copied to `avatar.png`), optionally switching palette/width/dither in the same go. |
+| `image` | `path [--palette NAME] [--width N] [--mode braille\|halfblock] [--no-dither]` | Sets your portrait (copied to `avatar.png`), optionally switching palette/width/render-style/dither in the same go. |
 | `list` | — | Print all fields as plain `label: value` lines. |
 | `palettes` | — | List built-in + custom palette names. |
 | `config` | — | Print the absolute path to `profile.json`. |
@@ -194,6 +196,7 @@ keys are backfilled when an older file is loaded):
 | `image_path` | `null` | Points at `avatar.png`. `null` = placeholder face. |
 | `palette` | `"gruvbox"` | Any name from `personfetch palettes`. |
 | `logo_width` | `34` | Portrait width in terminal cells (range 10–120 when set via CLI). |
+| `image_mode` | `"halfblock"` | Portrait style: `halfblock` (classic `▀`) or `braille` (2x-detail, 2x4 subpixels per cell). |
 | `gutter` | `3` | Spaces between portrait and info column. |
 | `dither` | `true` | Floyd–Steinberg dithering during quantization. |
 | `separator` | `":"` | Between label and value (e.g. `" → "` if you're fancy). |

@@ -31,6 +31,16 @@ def build_parser() -> argparse.ArgumentParser:
         dest="term_width",
         help="Force terminal width for layout",
     )
+    img_mode = parser.add_mutually_exclusive_group()
+    img_mode.add_argument(
+        "--kitty", action="store_true", help="Force Kitty graphics rendering"
+    )
+    img_mode.add_argument(
+        "--braille", action="store_true", help="Force braille rendering (2x detail)"
+    )
+    img_mode.add_argument(
+        "--ascii", action="store_true", help="Force half-block rendering"
+    )
 
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("init", help="Run the interactive setup wizard")
@@ -54,17 +64,32 @@ def build_parser() -> argparse.ArgumentParser:
     imgp.add_argument("path", help="Path to image file")
     imgp.add_argument("--palette", help="Palette name")
     imgp.add_argument("--width", type=int, help="Logo width")
+    imgp.add_argument(
+        "--mode",
+        choices=("braille", "halfblock"),
+        help="Portrait rendering style (2x-detailed braille or classic half-blocks)",
+    )
     imgp.add_argument("--no-dither", action="store_true", help="Disable dithering")
 
     sub.add_parser("config", help="Print the config file path")
     sub.add_parser("palettes", help="List available palettes")
+    sub.add_parser("doctor", help="Diagnose terminal image support")
 
     return parser
 
 
 def cmd_show(args: argparse.Namespace) -> int:
     profile = load_profile()
-    print(render(profile, width=args.term_width))
+    mode = (
+        "kitty"
+        if args.kitty
+        else "braille"
+        if args.braille
+        else "ascii"
+        if args.ascii
+        else "auto"
+    )
+    print(render(profile, width=args.term_width, mode=mode))
     return 0
 
 
@@ -114,6 +139,8 @@ def cmd_image(args: argparse.Namespace) -> int:
         profile["palette"] = args.palette
     if args.width:
         profile["logo_width"] = max(10, min(120, args.width))
+    if args.mode:
+        profile["image_mode"] = args.mode
     profile["dither"] = not args.no_dither
     save_profile(profile)
     print(f"Portrait set to {src}")
@@ -132,6 +159,31 @@ def cmd_palettes(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_doctor(args: argparse.Namespace) -> int:
+    import os
+    from pathlib import Path as _Path
+
+    from . import kitty as kitty_mod
+
+    profile = load_profile()
+    image_path = profile.get("image_path")
+    print(f"stdout is a tty: {sys.stdout.isatty()}")
+    print(
+        f"TERM={os.environ.get('TERM', '')!r}"
+        f" TMUX={'set' if os.environ.get('TMUX') else 'unset'}"
+        f" PERSONFETCH_KITTY={os.environ.get('PERSONFETCH_KITTY', '')!r}"
+    )
+    status = ""
+    if image_path and not _Path(image_path).exists():
+        status = " (missing)"
+    print(f"image: {image_path or '(none)'}{status}")
+    print(
+        "kitty probe:"
+        f" {'SUPPORTED' if kitty_mod.supports_kitty() else 'not supported -> half-block fallback'}"
+    )
+    return 0
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
@@ -146,6 +198,7 @@ def main() -> int:
         "image": cmd_image,
         "config": cmd_config,
         "palettes": cmd_palettes,
+        "doctor": cmd_doctor,
     }.get(command)
     if not func:
         parser.print_help()
