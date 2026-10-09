@@ -3,6 +3,7 @@ name = "personfetch"
 version = "0.1.0"
 description = "fastfetch, but for people"
 readme = "README.md"
+license = "MIT"
 authors = [
     { name = "Narla7", email = "narlavaibhav7@gmail.com" }
 ]

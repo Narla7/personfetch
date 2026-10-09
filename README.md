@@ -18,8 +18,7 @@ $ personfetch
 ```
 
 (In real life the `▀` half-blocks are **colored** with your photo's pixels —
-two terminal rows per line, quantized to your palette for that blurry-retro
-vibe.)
+two terminal rows per line.)
 
 > **Version:** 0.1.0 · **Language:** Python ≥ 3.11 · **Runtime dep:** Pillow — that's it
 
@@ -51,8 +50,6 @@ vibe.)
   it, skipping the dark background colors), so you don't have to pick.
 - **Built-in palettes**: `gruvbox` and `catppuccin`, plus drop-in custom
   palettes as JSON files.
-- **Fully local.** No network calls, no telemetry, no accounts. Everything
-  lives in `~/.config/personfetch/`.
 - **Truecolor → 256-color fallback** handled automatically based on
   `COLORTERM`.
 - **OS easter egg** — a default `os:` field is detected from `/etc/os-release`
@@ -110,8 +107,8 @@ personfetch init                                      # interactive first-time s
 personfetch image ~/Pictures/me.jpg --palette catppuccin --width 34
 personfetch                                           # show your card (default command)
 personfetch set interests "linux, guitars,coding"
-personfetch add shell fish                            # `add` is an alias for `set`
-personfetch rm age
+personfetch add pronouns  he/him                            # `add` is an alias for `set`
+personfetch rm age                                    # what do you think it does???  
 personfetch list                                      # plain-text dump of all fields
 personfetch palettes                                  # what palettes exist
 personfetch config                                    # print the profile.json path
@@ -154,7 +151,7 @@ Add your own by dropping `~/.config/personfetch/palettes/<name>.json`:
 ```json
 {
   "name": "mytheme",
-  "description": "Custom retro palette",
+  "description": "better theme",
   "colors": ["#282828", "#cc241d", "#98971a", "#d79921", "#458588"]
 }
 ```
@@ -163,7 +160,7 @@ Rules of the road:
 
 - `colors` is a list of `#rrggbb` (or `#rgb`) hex strings — order matters for
   the auto-color cycling of new fields, and the first few entries tend to act
-  as backgrounds/darks, so keep them low-key.
+  as backgrounds/darks.
 - A custom palette file **overrides** a built-in of the same name (that's how
   you'd re-skin `gruvbox` without a new name).
 - `name`/`description` are optional metadata; only `colors` is required
@@ -260,7 +257,4 @@ and make the first run never break — profiles are saved atomically
 
 ## License
 
-<!-- TODO: pick and add a LICENSE (e.g. MIT) and update this section. -->
-
-Not yet decided — placeholder until a `LICENSE` file lands in the repo.
-Treat the code as © the author, do-not-redistribute for now.
+MIT — see the [LICENSE](LICENSE) file for details.
