@@ -1,0 +1,19 @@
+[project]
+name = "personfetch"
+version = "0.1.0"
+description = "fastfetch, but for people"
+readme = "README.md"
+authors = [
+    { name = "Narla7", email = "narlavaibhav7@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "pillow>=9.0.0",
+]
+
+[project.scripts]
+personfetch = "personfetch.__main__:main"
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
