@@ -113,8 +113,8 @@ def _render_halfblocks(image: Image.Image) -> list[str]:
 
 def portrait_from_path(
     path: Path | str,
-    palette: Palette,
-    target_width_cells: int = 34,
+    palette: Palette | None,
+    target_width_cells: int = 44,
     dither: bool = True,
 ) -> list[str]:
     """Load an image and convert it to a retro ANSI half-block portrait."""
@@ -139,7 +139,17 @@ def portrait_from_path(
         im = im.filter(
             ImageFilter.UnsharpMask(radius=1.5, percent=220, threshold=2)
         )
-        im = quantize_to_palette(im, palette, dither=dither)
+        if palette is None:
+            # Adaptive quantization: keep up to 256 of the photo's own tones,
+            # maximising detail instead of forcing a fixed theme palette.
+            dither_mode = Image.Dither.FLOYDSTEINBERG if dither else Image.Dither.NONE
+            im = im.quantize(
+                colors=256,
+                method=Image.Quantize.MEDIANCUT,
+                dither=dither_mode,
+            ).convert("RGB")
+        else:
+            im = quantize_to_palette(im, palette, dither=dither)
         return _render_halfblocks(im)
 
 

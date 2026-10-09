@@ -34,7 +34,7 @@ def pad_ansi(line: str, width: int) -> str:
     return line
 
 
-def _build_logo(profile: dict, palette: list[tuple[int, int, int]], logo_width: int) -> list[str]:
+def _build_logo(profile: dict, palette: list[tuple[int, int, int]] | None, logo_width: int) -> list[str]:
     image_path = profile.get("image_path")
     if image_path and Path(image_path).exists():
         try:
@@ -56,7 +56,9 @@ def render(profile: dict, width: int | None = None) -> str:
         width = term_w
 
     palette_name = profile.get("palette", "gruvbox")
-    palette = get_palette(palette_name, config_dir())
+    palette: list[tuple[int, int, int]] | None = (
+        None if palette_name == "auto" else get_palette(palette_name, config_dir())
+    )
     logo_width = max(4, profile.get("logo_width", 34))
     gutter = profile.get("gutter", 3)
     separator = profile.get("separator", ":")
