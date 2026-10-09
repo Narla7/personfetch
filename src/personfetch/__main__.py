@@ -72,7 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     expp = sub.add_parser("export", help="Render your card to a shareable PNG")
     expp.add_argument("-o", "--output", default="personfetch.png", help="Output PNG path")
-    expp.add_argument("--width", type=int, default=1200, help="Card width in pixels")
+    expp.add_argument("--font-size", type=int, default=30, help="Font size in pixels")
 
     return parser
 
@@ -163,7 +163,7 @@ def cmd_export(args: argparse.Namespace) -> int:
     from .export import export_png
 
     profile = load_profile()
-    dest = export_png(profile, args.output, width=args.width)
+    dest = export_png(profile, args.output, font_size=args.font_size)
     print(f"Card exported to {dest}")
     return 0
 

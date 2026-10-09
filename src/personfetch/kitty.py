@@ -107,23 +107,6 @@ def _probe_support(timeout: float = QUERY_TIMEOUT) -> bool:
     return b"\x1b_G" in _tty_query(query, done, timeout)
 
 
-_cached_cell_size: tuple[int, int] | None | bool = None  # None=unknown, False=unavailable
-
-
-def _cell_size(timeout: float = QUERY_TIMEOUT) -> tuple[int, int] | None:
-    """Report the terminal cell size in pixels via CSI 16 t (cached)."""
-    global _cached_cell_size
-    if _cached_cell_size is None:
-        import re as _re
-
-        def done(buf: bytes) -> bool:
-            return _re.search(rb"\x1b\[6;\d+;\d+t", buf) is not None
-
-        m = _re.search(rb"\x1b\[6;(\d+);(\d+)t", _tty_query("\x1b[16t", done, timeout))
-        _cached_cell_size = (int(m.group(2)), int(m.group(1))) if m else False
-    return _cached_cell_size or None
-
-
 def kitty_supported(force: str | None = None) -> bool:
     """Return True if kitty graphics should be attempted.
 
@@ -202,31 +185,6 @@ def transmit_png(
     return seq + _maybe_wrap(f"\x1b_G{display}\x1b\\")
 
 
-def display_rows(path: Path | str, cols: int) -> int:
-    """How many terminal rows the image will occupy at *cols* columns wide.
-
-    Exact when the terminal reports its cell size (CSI 16 t): the image is
-    scaled to ``cols`` cells wide with aspect preserved. Otherwise falls
-    back to the classic ~1:2 cell aspect guess.
-    """
-    try:
-        with Image.open(path) as im:
-            im = ImageOps.exif_transpose(im)
-            w, h = im.size
-        if w == 0:
-            return cols // 2
-        import math as _math
-
-        cell = _cell_size()
-        if cell is not None:
-            cw, ch = cell
-            if cw > 0 and ch > 0:
-                return max(1, _math.ceil(cols * cw * h / (w * ch)))
-        return max(1, round(cols * h / w / 2))
-    except Exception:
-        return cols // 2
-
-
 def kitty_full_card(profile: dict, cols: int = 80) -> str:
     """Render the whole card as one PNG and display it inline.
 
@@ -238,15 +196,14 @@ def kitty_full_card(profile: dict, cols: int = 80) -> str:
     """
     import tempfile as _tempfile
 
-    from .export import export_png
+    from .export import render_card_image
 
     tmp = _tempfile.NamedTemporaryFile(suffix=".png", delete=False)
     tmp.close()
     try:
-        # ~12px per column keeps text crisp without megabyte transmits.
-        png_path = export_png(profile, tmp.name, width=max(240, cols * 12))
-        rows = display_rows(png_path, cols)
-        seq = transmit_png(png_path, cols=cols, rows=rows)
+        img, disp_cols, rows = render_card_image(profile, max_cols=cols)
+        img.save(tmp.name, format="PNG")
+        seq = transmit_png(tmp.name, cols=disp_cols, rows=rows)
     finally:
         try:
             os.unlink(tmp.name)
